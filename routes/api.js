@@ -4,7 +4,7 @@ import express from 'express'
 const router = express.Router()
 
 // Set this to match the model name in your Prisma schema
-const model = 'cats'
+const model = 'item'
 
 // Prisma lets NodeJS communicate with MongoDB
 // Let's import and initialize the Prisma client
@@ -19,104 +19,101 @@ prisma.$connect().then(() => {
     console.error('Failed to connect to MongoDB:', err)
 })
 
-// ----- CREATE (POST) -----
-// Create a new record for the configured model
-// This is the 'C' of CRUD
+// Note: This is a community-curated collection where any user can add or remove items.
+// No user tracking or authentication is required.
+
+// ----- Toggle Item (Add/Remove) -----
+// For any given Pokemon, if it exists in the collection, remove it.
+// If it doesn't exist, add it with basic data from PokeAPI.
+
 router.post('/data', async (req, res) => {
     try {
-        // Remove the id field from request body if it exists
-        // MongoDB will auto-generate an ID for new records
-        const { id, ...createData } = req.body
+        const { name, url } = req.body
 
-        const created = await prisma[model].create({
-            data: createData
+        if (!name || !url) {
+            return res.status(400).send({ error: 'Invalid pokemon data. Must include name and url.' })
+        }
+
+        // Extract ID from URL (e.g., "25" from "https://pokeapi.co/api/v2/pokemon/25/")
+        const id = url.split('/').filter(e => Number(e)).pop()
+
+        if (!id) {
+            return res.status(400).send({ error: 'Could not extract ID from pokemon URL.' })
+        }
+
+        // Check if this pokemon already exists in the collection
+        const existing = await prisma[model].findFirst({
+            where: {
+                id: id
+            }
         })
-        res.status(201).send(created)
+
+        let action, item
+        if (existing) {
+            // Already in collection, so remove it
+            item = await prisma[model].delete({
+                where: { id: existing.id }
+            })
+            action = 'removed'
+        } else {
+            // Not in collection, so add it
+            item = await prisma[model].create({
+                data: {
+                    id: id,
+                    data: { name, url }
+                }
+            })
+            action = 'added'
+        }
+
+        res.status(action === 'added' ? 201 : 200).send({
+            action,
+            item
+        })
+
     } catch (err) {
         console.error('POST /data error:', err)
-        res.status(500).send({ error: 'Failed to create record', details: err.message || err })
+        res.status(500).send({ error: 'Failed to toggle item', details: err.message || err })
     }
 })
 
 
-// ----- READ (GET) list ----- 
+// ----- READ (GET) all items ----- 
 router.get('/data', async (req, res) => {
     try {
-        // fetch first 100 records from the database with no filter
-        const result = await prisma[model].findMany({
-            take: 100
+        // Get all items from the collection
+        const items = await prisma[model].findMany({
+            orderBy: { id: 'asc' }
         })
-        res.send(result)
+
+        res.send(items)
     } catch (err) {
         console.error('GET /data error:', err)
-        res.status(500).send({ error: 'Failed to fetch records', details: err.message || err })
+        res.status(500).send({ error: 'Failed to fetch items', details: err.message || err })
     }
 })
 
 
-
-// ----- findMany() with search ------- 
-// Accepts optional search parameter to filter by name field
-// See also: https://www.prisma.io/docs/orm/reference/prisma-client-reference#examples-7
-router.get('/search', async (req, res) => {
+// ----- READ (GET) single item by ID ----- 
+router.get('/data/:pokemonId', async (req, res) => {
     try {
-        // get search terms from query string, default to empty string
-        const searchTerms = req.query.terms || ''
-        // fetch the records from the database
-        const result = await prisma[model].findMany({
+        const pokemonId = req.params.pokemonId
+
+        // Find item by ID
+        const item = await prisma[model].findUnique({
             where: {
-                name: {
-                    contains: searchTerms,
-                    mode: 'insensitive'  // case-insensitive search
-                }
-            },
-            orderBy: { name: 'asc' },
-            take: 10
+                id: pokemonId
+            }
         })
-        res.send(result)
-    } catch (err) {
-        console.error('GET /search error:', err)
-        res.status(500).send({ error: 'Search failed', details: err.message || err })
-    }
-})
 
-
-// ----- UPDATE (PUT) -----
-// Listen for PUT requests
-// respond by updating a particular record in the database
-// This is the 'U' of CRUD
-// After updating the database we send the updated record back to the frontend.
-router.put('/data/:id', async (req, res) => {
-    try {
-        // Remove the id from the request body if it exists
-        // The id should not be in the data payload for updates
-        const { id, ...updateData } = req.body
-
-        // Prisma update returns the updated version by default
-        const updated = await prisma[model].update({
-            where: { id: req.params.id },
-            data: updateData
+        res.send({
+            exists: !!item,
+            item: item || null
         })
-        res.send(updated)
-    } catch (err) {
-        console.error('PUT /data/:id error:', err)
-        res.status(500).send({ error: 'Failed to update record', details: err.message || err })
-    }
-})
 
-// ----- DELETE -----
-// Listen for DELETE requests
-// respond by deleting a particular record in the database
-// This is the 'D' of CRUD
-router.delete('/data/:id', async (req, res) => {
-    try {
-        const result = await prisma[model].delete({
-            where: { id: req.params.id }
-        })
-        res.send(result)
     } catch (err) {
-        console.error('DELETE /data/:id error:', err)
-        res.status(500).send({ error: 'Failed to delete record', details: err.message || err })
+        console.error('GET /data/:pokemonId error:', err)
+        res.status(500).send({ error: 'Failed to fetch item', details: err.message || err })
     }
 })
 
