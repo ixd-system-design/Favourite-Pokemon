@@ -1,10 +1,9 @@
-
+import { isFavourite } from './favourites.js'
 
 // For the Full profile, we may like to control which image to show
 // there are lots of images available. (take a look at the JSON in the console for details)
 // I will use the "dream_world" image here by default, as it is a nice vector image,
 // if not available we will use in order: dream_world, home, or just the ordinary pokeball.
-import { toggleFavorite } from './toggle.js';
 
 const getProfileImageURL = (pokemon) => {
   const dream_world = pokemon.sprites?.other?.['dream_world']?.front_default
@@ -17,24 +16,14 @@ const getProfileImageURL = (pokemon) => {
 // and build a profile for the pokemon. 
 // this includes a template populated with details 
 // it also includes a close button.
-const createProfile = async (popoverId, url) => {
+const createProfile = async (popoverId, url, pokemonName) => {
   const data = await fetch(url)
   const pokemon = await data.json()
   const imageURL = getProfileImageURL(pokemon)
 
-  // Fetch current collection status on demand
-  let isInCollection = false
+  // Use existing isFavourite() function instead of separate API call
 
-  try {
-    const collectionResponse = await fetch(`/data/${pokemon.id}`)
-    const fetchedData = await collectionResponse.json()
-    isInCollection = fetchedData.exists
-  } catch (err) {
-    console.error('Failed to fetch collection status:', err)
-  }
-
-  // Two-state heart system
-  const heartIcon = isInCollection ? 'heart-fill.svg' : 'heart-outline.svg'
+  const heartIcon = isFavourite(pokemonName) ? 'heart-fill.svg' : 'heart-outline.svg'
 
   // build a template to hold details for this pokemon 
   const template = ` 
@@ -46,7 +35,7 @@ const createProfile = async (popoverId, url) => {
       <div class="characteristics"> 
         <div class="name-with-favorite">
           <h2>${pokemon.name}</h2>
-          <button class="favorite" data-pokemon-name="${pokemon.name}">
+          <button class="favorite" data-pokemon-name="${pokemon.name}" data-pokemon-url="${url}">
             <img src="${heartIcon}" class="heart" />
           </button>
         </div>
@@ -79,8 +68,6 @@ const createProfile = async (popoverId, url) => {
         </div>`).join(' ')}
     </div>
   </div>`
-
-
   return DOMPurify.sanitize(template)
 }
 

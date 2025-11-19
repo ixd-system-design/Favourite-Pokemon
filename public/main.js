@@ -1,5 +1,19 @@
 import { createNavigation } from './navigation.js';
 import { createListings } from './listings.js';
+import { getFavourites, toggleFavorite } from './favourites.js';
+
+// Handle favorite button clicks 
+document.addEventListener('click', (e) => {
+  const favoriteBtn = e.target.closest('.favorite')
+  if (favoriteBtn) {
+    const { pokemonName, pokemonUrl } = favoriteBtn.dataset
+    toggleFavorite(pokemonName, pokemonUrl)
+  }
+})
+
+// Fetch favourites from our API 
+const favourites = await getFavourites()
+console.log('Favourites', favourites)
 
 // fetch a simple list of all pokemon types (fighting, flying, etc.)
 // This only includes the name and url for each.
@@ -19,44 +33,13 @@ const pokemonTypes = await Promise.all(
 )
 console.log('Pokemon Types with Details', pokemonTypes)
 
-// Fetch collection data from our API
-// This now returns an array of items with full pokemon data
-let collectionSet = new Set()
-let collectionList = []
-try {
-  const collectionResponse = await fetch('/data')
-  const items = await collectionResponse.json()
-  collectionList = items
-  // Build a Set of pokemon names for quick lookup
-  collectionSet = new Set(items.map(item => item.data.name))
-  console.log('Collection Data', items)
-  console.log('Collection Set', collectionSet)
-} catch (err) {
-  console.error('Failed to fetch collection:', err)
-}
-
-// Create a special "collection" type that matches the pokemonTypes structure
-// This will only include pokemon that are in the collection
-const collectionType = {
-  name: 'favourites',
-  pokemon: collectionList.map(item => ({
-    pokemon: {
-      name: item.data.name,
-      url: `https://pokeapi.co/api/v2/pokemon/${item.id}/`
-    }
-  }))
-}
-
 // Now we can build the navigation menu and listings for each type
-createNavigation(pokemonTypes, collectionType)
+createNavigation(pokemonTypes)
 
 // Create listings for each pokemon type (filter out empty types)
 pokemonTypes
   .filter(pokemonType => pokemonType.pokemon.length > 0)
-  .forEach(pokemonType => createListings(pokemonType, collectionSet))
+  .forEach(pokemonType => createListings(pokemonType))
 
-// Also create the collection section
-if (collectionType.pokemon.length > 0) {
-  createListings(collectionType, collectionSet)
-}
+
 
