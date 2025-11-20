@@ -7,4 +7,4 @@ This demo illustrates how we can combine Third Party Data from [https://pokeapi.
 - Add a `.env` file to the root of your project containing the variable `DATABASE_URL` with a MongoDB connection String as the value.
 
 ## Iteration
-If you find the patterns in this demo useful, you may apply the same approach in your own project. 
+If you find the patterns in this demo useful, you may apply the same approach in your own project. You may be able to borrow this pattern for use in other contexts where a favourites feature is useful.
